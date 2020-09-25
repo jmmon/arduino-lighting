@@ -5,7 +5,7 @@
  * WORKS WELL
  * 
 
-single press:       if off, turn on low; if on, turn off
+single press:       if off, turn on medium; if on, turn off
 
 double press:       if off, turn on max; if on, turn off
 
@@ -41,22 +41,15 @@ triple press+hold:  ()
  */
 
 
-  //AT THIS FADE LEVEL, takes ~86 steps to go from 0 to 255 level.
-#include <avr/pgmspace.h>
-
+#include <avr/pgmspace.h> //for storing in progmem
 #include <DmxSimple.h>
 const String VERSION = "Light_3.0.4: Structs and Light ID\n - SERIAL Enabled; DMX Disabled";
 const bool DEBUG = false;                                                                                       // DEBUG }}
 
 const uint8_t DMX_PIN = 3;
 const uint8_t BUTTON_PIN = A3;
-//const int BUTTON_KITCHEN_PIN = A3;
-//const int BUTTON_ENTRY_PIN = A2;
-//const int BUTTON_SCONCE_PIN = A4;
-//const int BUTTON_BACKWALL_PIN = A5;
-//const int BUTTON_BATH_PIN = A6;
 
-const uint8_t CHANNELS = 64;
+const uint8_t CHANNELS = 64;    //uses only 32 channels, but every odd channel from 1-63, so set max to 64.
 const uint8_t BUTTON_COUNT = 3;
 const uint8_t MAX_PRESS_COUNT = 6;
 
@@ -80,11 +73,11 @@ const uint16_t BLUE_LIST[]  = {  0,   0,   0, MIDDLE, MAX_BRIGHTNESS, MIDDLE};
 const uint8_t COLOR_PROGRESS_DELAY_COUNT = 1;   // color progresses every n loop occurances
 
 
-//1024{7415:861}
+
+  //Storing in PROGMEM allows for such a large array (1023 values). Without PROGMEM, an array of 512 values pushed the limit of dynamic memory but now it's ~51%.
 const uint8_t DIMMER_TABLE_WIDTH = 32;
 const uint8_t DIMMER_TABLE_HEIGHT = 32;
 const uint8_t DIMMER_LOOKUP_TABLE[DIMMER_TABLE_HEIGHT][DIMMER_TABLE_WIDTH] PROGMEM = {      //light values lookup table, built on an S curve, to make LED dimming feel linear.
-  //Storing in PROGMEM allows for such a large array (1023 values). Without PROGMEM, an array of 512 values pushed the limit of dynamic memory but now it's ~51%.
 { 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, },
 { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, },
 { 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, },
@@ -118,7 +111,6 @@ const uint8_t DIMMER_LOOKUP_TABLE[DIMMER_TABLE_HEIGHT][DIMMER_TABLE_WIDTH] PROGM
 { 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 254, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, },
 { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, },
 { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, },
-
 };
 
 struct button_t {
@@ -134,7 +126,7 @@ struct button_t {
     {0, 0, 0, false, BUTTON_RESISTANCE[1], 1},  //kitchen button (left)
     //{0, 0, 0, false, BUTTON_RESISTANCE[2], 7},  //Back wall button
     //{0, 0, 0, false, BUTTON_RESISTANCE[2], 2},  //Bath light button
-    {0, 0, 0, false, BUTTON_RESISTANCE[2], 8},  //sconce 1 button
+    {0, 0, 0, false, BUTTON_RESISTANCE[2], 2},  //sconce 1 button
     
 };
 
@@ -161,6 +153,9 @@ struct lightSection_t {
     {{0., 0., 0., 0.}, {0., 0., 0., 0.}, {1, 1, 1, 1},      false, 1, 1., 4,        0, 0, false,        {0, 0, 0}, 0, 1},      //  ID 0    Living Room Lights
 
     {{0., 0., 0., 0.}, {0., 0., 0., 0.}, {1, 1, 1, 1},      false, 1, 1.2, 3,       0, 0, false,        {0, 0, 0}, 0, 1},      //  ID 1    Kitchen Lights
+    
+    {{0., 0., 0., 0.}, {0., 0., 0., 0.}, {1, 1, 1, 1},      false, 1, 1.2, 2,        0, 0, false,        {0, 0, 0}, 0, 1},      //  ID 2   PORCH LIGHTS
+    
 //below: not yet used
 //    {{0., 0., 0., 0.}, {0., 0., 0., 0.}, {false, false, false, false}, {1, 1, 1, 1},      false, 1, 1., 0,        0, 0, false,        {0, 0, 0}, 0, 1},      //  ID 2    Bath Light
 //
@@ -176,7 +171,6 @@ struct lightSection_t {
 
     
     
-    {{0., 0., 0., 0.}, {0., 0., 0., 0.}, {1, 1, 1, 1},      false, 1, 1., 8,        0, 0, false,        {0, 0, 0}, 0, 1},      //  ID 8    TEST closet lights
 };
 
 //************************************************************************************************************************************************************ END VARIABLES
